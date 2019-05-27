@@ -10,39 +10,93 @@ using System.Collections.Generic;
 namespace Ad2mod
 {
 
-    //public class Ad2Settings : ModSettings
-    //{
-    //    public int defaultThreshold = 20;
+    public class Ad2Settings : ModSettings
+    {
+        public int defaultThreshold = 20;
 
-    //    public override void ExposeData()
-    //    {
-    //        Scribe_Values.Look(ref defaultThreshold, "threshold", 20);
-    //        base.ExposeData();
-    //   }
-    //}
+        public override void ExposeData()
+        {
+            Scribe_Values.Look(ref defaultThreshold, "defaultThreshold", 20);
+            base.ExposeData();
+        }
+    }
 
     class Ad2Mod : Mod
     {
-        //public static Ad2Settings settings;
+        public static Ad2Settings settings;
         public static Ad2Mod instance;
+
+        NumField defaultThresholdField = new NumField();
+        NumField thresholdField = new NumField();
+        Game lastGame;
+
+        class NumField
+        {
+            string buffer;
+
+            public void Reset()
+            {
+                buffer = null;
+            }
+            public bool DoField(float y, string label, ref int val)
+            {
+                if (buffer == null)
+                    buffer = val.ToString();
+                float x = 0;
+                Widgets.Label(new Rect(x, y, 200, 32), label);
+                x += 200;
+                buffer = Widgets.TextField(new Rect(x, y, 100, 32), buffer);
+                x += 100;
+                if (Widgets.ButtonText(new Rect(x, y, 100, 32), "Apply"))
+                {
+                    int resInt;
+                    if (int.TryParse(buffer, out resInt))
+                    {
+                        val = resInt;
+                        return true;
+                    }
+                    buffer = val.ToString();
+                }
+                return false;
+            }
+        }
 
         public Ad2Mod(ModContentPack content) : base(content)
         {
             instance = this;
-            //settings = GetSettings<Ad2Settings>();
-            //Log.Message("settings.defaultThreshold = " + settings.defaultThreshold.ToString());
+            settings = GetSettings<Ad2Settings>();
+            Log.Message("settings.defaultThreshold = " + settings.defaultThreshold);
         }
 
         public override string SettingsCategory() => "Bulk craft";
 
         public override void DoSettingsWindowContents(Rect inRect)
         {
+            float x = inRect.x;
+            float y = inRect.y;
+            if(defaultThresholdField.DoField(y, "default threshold", ref settings.defaultThreshold))
+                Messages.Message("defaultThreshold changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
+
+            y += 32;
+
             if (Current.Game == null)
+            {
+                lastGame = null;
                 return;
+            }
+            if (lastGame != Current.Game)
+                thresholdField.Reset();
+            var wc = Ad2WorldComp.instance;
+            if (thresholdField.DoField(y, "current game threshold", ref wc.threshold))
+                Messages.Message("current game threshold changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
+            lastGame = Current.Game;
+
+            y += 32;
+
             List<Bill> bills = Ad2.FindRecipesUses();
             string s = $"Remove modded recipes from save ({bills.Count} found)";
             var w = Text.CalcSize(s).x + 64;
-            if (Widgets.ButtonText( new Rect(inRect.x, inRect.y, w, 32), s))
+            if (Widgets.ButtonText( new Rect(x, y, w, 32), s))
             {
                 foreach (Bill bill in bills)
                     bill.billStack.Delete(bill);
@@ -55,7 +109,13 @@ namespace Ad2mod
     [StaticConstructorOnStartup]
     public class Ad2
     {
+        const int thresholdLimit = 120;
+
+        //  old:new
         public static Dictionary<RecipeDef, RecipeDef> dict = new Dictionary<RecipeDef, RecipeDef>();
+        //  new:old
+        public static Dictionary<RecipeDef, RecipeDef> dictReversed = new Dictionary<RecipeDef, RecipeDef>();
+
 
         static Ad2()
         {
@@ -75,13 +135,17 @@ namespace Ad2mod
                 {
                     foreach (Bill bill in wt.BillStack)
                     {
-                        if (dict.ContainsValue(bill.recipe))
+                        if (dictReversed.ContainsKey(bill.recipe))
                             res.Add(bill);
                     }
                 }
             }
             return res;
         }
+
+        public static bool IsSrcRecipe(RecipeDef recipe) => dict.ContainsKey(recipe);
+        public static bool IsNewRecipe(RecipeDef recipe) => dictReversed.ContainsKey(recipe);
+
 
         public static RecipeDef MkNewRecipe(RecipeDef rd)
         {
@@ -133,7 +197,7 @@ namespace Ad2mod
 
         public static void GenRecipes()
         {
-            const int THRESHOLD = 20;
+            const int THRESHOLD = thresholdLimit;
 
             var allRecipes = DefDatabase<RecipeDef>.AllDefsListForReading;
             var srcs = new List<RecipeDef>();
@@ -158,6 +222,7 @@ namespace Ad2mod
                 DefDatabase<RecipeDef>.Add(def: newRecipe);
 
                 dict.Add(recipe, newRecipe);
+                dictReversed.Add(newRecipe, recipe);
 
                 //Log.Message(newRecipe.label);
                 foreach (var ru in recipe.AllRecipeUsers)
