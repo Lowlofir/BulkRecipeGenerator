@@ -2,7 +2,7 @@
 <ModMetaData>
 	<name>Bulk craft</name>
 	<author>IWTKU</author>
-	<targetVersion>1.0.0</targetVersion>
+	<targetVersion>1.0</targetVersion>
 <description>Adds bulk recipes for what takes less than 20 seconds to make.
 Should work with recipes from other mods.
 </description>	
