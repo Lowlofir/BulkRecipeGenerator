@@ -25,11 +25,12 @@ namespace Ad2mod
             List<RecipeDef> res = new List<RecipeDef>();
             foreach (var r in __result)
             {
-                if (!r.defName.EndsWith("_5x"))
-                { 
+                if (!Ad2.IsNewRecipe(r))
+                {
                     res.Add(r);
-                    if (Ad2.dict.ContainsKey(r))
-                        res.Add(Ad2.dict[r]);
+                    RecipeDef newR = Ad2.GetNewRecipe(r);
+                    if (newR != null)
+                        res.Add(newR);
                 }
             }
 
@@ -37,6 +38,25 @@ namespace Ad2mod
             //Log.Message("___allRecipesCached = res");
 
             return res;
+        }
+    }
+
+
+    [HarmonyPatch(typeof(RecipeDef))]
+    [HarmonyPatch("AvailableNow", MethodType.Getter)]
+    public class RecipeDef_AvailableNow_Getter_Patch
+    {
+        public static bool Postfix(bool __result, RecipeDef __instance)
+        {
+            if (__result == false)
+                return __result;
+            RecipeDef srcRecipe = Ad2.GetSrcRecipe(__instance);
+            if (srcRecipe != null && srcRecipe.WorkAmountTotal(null) > Ad2WorldComp.instance.threshold * 60)
+            {
+               // Log.Message(__instance.label + " rejected with src workAmount " + srcRecipe.WorkAmountTotal(null)/60);
+                return false;
+            }
+            return __result;
         }
     }
 }
