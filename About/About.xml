@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ModMetaData>
-	<name>Bulk craft</name>
-	<author>IWTKU</author>
+	<name>Bulk recipe generator</name>
+	<author>Lowlofir</author>
 	<targetVersion>1.0</targetVersion>
-<description>Adds bulk recipes for what takes less than 20 seconds to make.
-Should work with recipes from other mods.
+<description>Adds bulk recipes for what crafts too fast.
+You can change what means "too fast" in mod settings.
 </description>	
 </ModMetaData>

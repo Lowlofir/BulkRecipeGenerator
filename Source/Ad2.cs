@@ -54,19 +54,24 @@ namespace Ad2mod
             }
             public bool DoField(float y, string label, ref int val)
             {
+                float LH = Text.LineHeight;
                 if (buffer == null)
                     buffer = val.ToString();
                 float x = 0;
-                Widgets.Label(new Rect(x, y, 200, 32), label);
+                TextAnchor anchor = Text.Anchor;
+                Text.Anchor = TextAnchor.MiddleLeft;
+                Widgets.Label(new Rect(x, y, 200, LH), label);
+                Text.Anchor = anchor;
                 x += 200;
-                buffer = Widgets.TextField(new Rect(x, y, 100, 32), buffer);
-                x += 100;
-                if (Widgets.ButtonText(new Rect(x, y, 100, 32), "Apply"))
+                buffer = Widgets.TextField(new Rect(x, y, 60, LH), buffer);
+                x += 60;
+                if (Widgets.ButtonText(new Rect(x, y, 100, LH), "Apply"))
                 {
                     int resInt;
                     if (int.TryParse(buffer, out resInt))
                     {
                         val = Util.Clamp(resInt, min, max);
+                        buffer = val.ToString();
                         return true;
                     }
                     buffer = val.ToString();
@@ -82,30 +87,42 @@ namespace Ad2mod
             //Log.Message("settings.defaultThreshold = " + settings.defaultThreshold);
         }
 
-        public override string SettingsCategory() => "Bulk craft";
+        public override string SettingsCategory() => "Bulk recipe generator";
 
         public override void DoSettingsWindowContents(Rect inRect)
         {
             float x = inRect.x;
             float y = inRect.y;
-            if(defaultThresholdField.DoField(y, "default threshold", ref settings.defaultThreshold))
-                Messages.Message("defaultThreshold changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
+            float LH = Text.LineHeight;
+            y += LH;
 
-            y += 32;
+            Text.Font = GameFont.Medium;
+            Widgets.Label(new Rect(x, y, 200, Text.LineHeight), "Global settings");
+            y += Text.LineHeight + 2;
+            Text.Font = GameFont.Small;
+            if (defaultThresholdField.DoField(y, "Default threshold", ref settings.defaultThreshold))
+                Messages.Message("Default threshold changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
+
+            y += 2*LH+2;
 
             if (Current.Game == null)
             {
                 lastGame = null;
                 return;
             }
+            Text.Font = GameFont.Medium;
+            Widgets.Label(new Rect(x, y, 200, Text.LineHeight), "World settings");
+            y += Text.LineHeight + 2;
+            Text.Font = GameFont.Small;
+
             if (lastGame != Current.Game)
                 thresholdField.Reset();
             var wc = Ad2WorldComp.instance;
-            if (thresholdField.DoField(y, "current game threshold", ref wc.threshold))
-                Messages.Message("current game threshold changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
+            if (thresholdField.DoField(y, "Current game threshold", ref wc.threshold))
+                Messages.Message("Current game threshold changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
             lastGame = Current.Game;
 
-            y += 32;
+            y += 2*LH+2;
 
             List<Bill> bills = Ad2.FindRecipesUses();
             string s = $"Remove modded recipes from save ({bills.Count} found)";
