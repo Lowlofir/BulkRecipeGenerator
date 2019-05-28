@@ -28,8 +28,9 @@ namespace Ad2mod
                 if (!Ad2.IsNewRecipe(r))
                 {
                     res.Add(r);
-                    if (Ad2.IsSrcRecipe(r))
-                        res.Add(Ad2.dict[r]);
+                    RecipeDef newR = Ad2.GetNewRecipe(r);
+                    if (newR != null)
+                        res.Add(newR);
                 }
             }
 
@@ -49,10 +50,10 @@ namespace Ad2mod
         {
             if (__result == false)
                 return __result;
-            var dictNO = Ad2.dictReversed;
-            if (Ad2.IsNewRecipe(__instance) && dictNO[__instance].WorkAmountTotal(null) > Ad2WorldComp.instance.threshold * 60)
+            RecipeDef srcRecipe = Ad2.GetSrcRecipe(__instance);
+            if (srcRecipe != null && srcRecipe.WorkAmountTotal(null) > Ad2WorldComp.instance.threshold * 60)
             {
-                Log.Message(__instance.label + " rejected with src workAmount " + dictNO[__instance].WorkAmountTotal(null)/60);
+               // Log.Message(__instance.label + " rejected with src workAmount " + srcRecipe.WorkAmountTotal(null)/60);
                 return false;
             }
             return __result;

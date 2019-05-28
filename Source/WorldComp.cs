@@ -15,7 +15,7 @@ namespace Ad2mod
         {
             instance = this;
             threshold = Ad2Mod.settings.defaultThreshold;
-            Log.Message("WorldComp.ctr():  " + world.info.name + "  " + world.info.seedString);
+            //Log.Message("WorldComp.ctr():  " + world.info.name + "  " + world.info.seedString);
         }
 
 
@@ -23,7 +23,7 @@ namespace Ad2mod
         {
             base.ExposeData();
             Scribe_Values.Look(ref threshold, "threshold");
-            Log.Message("WorldComp.ExposeData()  threshold = " + threshold);
+            //Log.Message("WorldComp.ExposeData()  threshold = " + threshold);
         }
     }
 }

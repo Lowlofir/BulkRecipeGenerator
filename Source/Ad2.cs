@@ -9,6 +9,14 @@ using System.Collections.Generic;
 
 namespace Ad2mod
 {
+    class Util
+    {
+        public static int Clamp(int val, int a, int b)
+        {
+            return (val < a) ? a : ((val > b) ? b : val);
+        }
+    }
+
 
     public class Ad2Settings : ModSettings
     {
@@ -33,7 +41,13 @@ namespace Ad2mod
         class NumField
         {
             string buffer;
+            int min, max;
 
+            public NumField(int min = 0, int max = 120)
+            {
+                this.min = min;
+                this.max = max;
+            }
             public void Reset()
             {
                 buffer = null;
@@ -52,7 +66,7 @@ namespace Ad2mod
                     int resInt;
                     if (int.TryParse(buffer, out resInt))
                     {
-                        val = resInt;
+                        val = Util.Clamp(resInt, min, max);
                         return true;
                     }
                     buffer = val.ToString();
@@ -112,9 +126,9 @@ namespace Ad2mod
         const int thresholdLimit = 120;
 
         //  old:new
-        public static Dictionary<RecipeDef, RecipeDef> dict = new Dictionary<RecipeDef, RecipeDef>();
+        static Dictionary<RecipeDef, RecipeDef> dict = new Dictionary<RecipeDef, RecipeDef>();
         //  new:old
-        public static Dictionary<RecipeDef, RecipeDef> dictReversed = new Dictionary<RecipeDef, RecipeDef>();
+        static Dictionary<RecipeDef, RecipeDef> dictReversed = new Dictionary<RecipeDef, RecipeDef>();
 
 
         static Ad2()
@@ -135,7 +149,7 @@ namespace Ad2mod
                 {
                     foreach (Bill bill in wt.BillStack)
                     {
-                        if (dictReversed.ContainsKey(bill.recipe))
+                        if (IsNewRecipe(bill.recipe))
                             res.Add(bill);
                     }
                 }
@@ -145,6 +159,19 @@ namespace Ad2mod
 
         public static bool IsSrcRecipe(RecipeDef recipe) => dict.ContainsKey(recipe);
         public static bool IsNewRecipe(RecipeDef recipe) => dictReversed.ContainsKey(recipe);
+
+        public static RecipeDef GetSrcRecipe(RecipeDef recipe)
+        {
+            RecipeDef res;
+            dictReversed.TryGetValue(recipe, out res);
+            return res;
+        }
+        public static RecipeDef GetNewRecipe(RecipeDef recipe)
+        {
+            RecipeDef res;
+            dict.TryGetValue(recipe, out res);
+            return res;
+        }
 
 
         public static RecipeDef MkNewRecipe(RecipeDef rd)
