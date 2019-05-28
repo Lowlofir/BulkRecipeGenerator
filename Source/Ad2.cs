@@ -79,7 +79,7 @@ namespace Ad2mod
         {
             instance = this;
             settings = GetSettings<Ad2Settings>();
-            Log.Message("settings.defaultThreshold = " + settings.defaultThreshold);
+            //Log.Message("settings.defaultThreshold = " + settings.defaultThreshold);
         }
 
         public override string SettingsCategory() => "Bulk craft";
