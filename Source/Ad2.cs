@@ -20,11 +20,13 @@ namespace Ad2mod
 
     public class Ad2Settings : ModSettings
     {
-        public int defaultThreshold = 20;
+        public int defaultThreshold = 60;
+        public bool limitToX5 = true;
 
         public override void ExposeData()
         {
-            Scribe_Values.Look(ref defaultThreshold, "defaultThreshold", 20);
+            Scribe_Values.Look(ref defaultThreshold, "defaultThreshold", 60);
+            Scribe_Values.Look(ref limitToX5, "limitToX5", true);
             base.ExposeData();
         }
     }
@@ -100,8 +102,11 @@ namespace Ad2mod
             Widgets.Label(new Rect(x, y, 200, Text.LineHeight), "Global settings");
             y += Text.LineHeight + 2;
             Text.Font = GameFont.Small;
-            if (defaultThresholdField.DoField(y, "Default threshold", ref settings.defaultThreshold))
-                Messages.Message("Default threshold changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
+            if (defaultThresholdField.DoField(y, "Default target time", ref settings.defaultThreshold))
+                Messages.Message("Default target time changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
+            
+            y += LH;
+            Widgets.CheckboxLabeled( new Rect(x, y, 360, LH), "Stop on x5 recipes", ref settings.limitToX5);
 
             y += 2*LH+2;
 
@@ -118,8 +123,8 @@ namespace Ad2mod
             if (lastGame != Current.Game)
                 thresholdField.Reset();
             var wc = Ad2WorldComp.instance;
-            if (thresholdField.DoField(y, "Current game threshold", ref wc.threshold))
-                Messages.Message("Current game threshold changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
+            if (thresholdField.DoField(y, "Current game target time", ref wc.threshold))
+                Messages.Message("Current game target time changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
             lastGame = Current.Game;
 
             y += 2*LH+2;
@@ -141,18 +146,38 @@ namespace Ad2mod
     public class Ad2
     {
         const int thresholdLimit = 120;
+        static readonly int[] mulFactors = { 5, 10, 25 };
 
         //  old:new
-        static Dictionary<RecipeDef, RecipeDef> dict = new Dictionary<RecipeDef, RecipeDef>();
+        static Dictionary<RecipeDef, List<RecipeDef>> dictON = new Dictionary<RecipeDef, List<RecipeDef>>();
         //  new:old
-        static Dictionary<RecipeDef, RecipeDef> dictReversed = new Dictionary<RecipeDef, RecipeDef>();
+        static Dictionary<RecipeDef, RecipeDef> dictNO = new Dictionary<RecipeDef, RecipeDef>();
 
-
-        static Ad2()
+        static void RememberNewRecipe(RecipeDef src, RecipeDef n)
         {
-            var harmony = HarmonyInstance.Create("com.local.anon.ad2");
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
-            GenRecipes();
+            if (!dictON.ContainsKey(src))
+                dictON.Add(src, new List<RecipeDef>());
+            dictON[src].Add(n);
+
+            if (dictNO.ContainsKey(n))
+                Log.Error($"dictNO already contains {n.defName} ({n.label})");
+            dictNO.Add(n, src);
+        }
+
+        public static bool IsSrcRecipe(RecipeDef recipe) => dictON.ContainsKey(recipe);
+        public static bool IsNewRecipe(RecipeDef recipe) => dictNO.ContainsKey(recipe);
+
+        public static RecipeDef GetSrcRecipe(RecipeDef recipe)
+        {
+            RecipeDef res;
+            dictNO.TryGetValue(recipe, out res);
+            return res;
+        }
+        public static List<RecipeDef> GetNewRecipesList(RecipeDef recipe)
+        {
+            List<RecipeDef> res;
+            dictON.TryGetValue(recipe, out res);
+            return res;
         }
 
         public static List<Bill> FindRecipesUses()
@@ -174,34 +199,24 @@ namespace Ad2mod
             return res;
         }
 
-        public static bool IsSrcRecipe(RecipeDef recipe) => dict.ContainsKey(recipe);
-        public static bool IsNewRecipe(RecipeDef recipe) => dictReversed.ContainsKey(recipe);
 
-        public static RecipeDef GetSrcRecipe(RecipeDef recipe)
+        static Ad2()
         {
-            RecipeDef res;
-            dictReversed.TryGetValue(recipe, out res);
-            return res;
-        }
-        public static RecipeDef GetNewRecipe(RecipeDef recipe)
-        {
-            RecipeDef res;
-            dict.TryGetValue(recipe, out res);
-            return res;
+            var harmony = HarmonyInstance.Create("com.local.anon.ad2");
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
+            GenRecipes();
         }
 
-
-        public static RecipeDef MkNewRecipe(RecipeDef rd)
+        static RecipeDef MkNewRecipe(RecipeDef rd, int factor)
         {
             if (rd.ingredients.Count == 0 || rd.products.Count != 1)
                 return null;
 
-            const int FACTOR = 5;
             RecipeDef r = new RecipeDef
             {
-                defName = rd.defName + "_5x",
-                label = rd.label + " x5",
-                description = rd.description + " (x5)",
+                defName = rd.defName + $"_{factor}x",
+                label = rd.label + $" x{factor}",
+                description = rd.description + $" (x{factor})",
                 jobString = rd.jobString,
                 modContentPack = rd.modContentPack,
                 workSpeedStat = rd.workSpeedStat,
@@ -218,17 +233,17 @@ namespace Ad2mod
                 allowMixingIngredients = rd.allowMixingIngredients,
                 defaultIngredientFilter = rd.defaultIngredientFilter,
             };
-            r.products.Add(new ThingDefCountClass(rd.products[0].thingDef, rd.products[0].count * FACTOR));
+            r.products.Add(new ThingDefCountClass(rd.products[0].thingDef, rd.products[0].count * factor));
             List<IngredientCount> new_ingredients = new List<IngredientCount>();
             foreach (var oic in rd.ingredients)
             {
                 var nic = new IngredientCount();
-                nic.SetBaseCount(oic.GetBaseCount() * FACTOR);
+                nic.SetBaseCount(oic.GetBaseCount() * factor);
                 nic.filter = oic.filter;
                 new_ingredients.Add(nic);
             }
             r.ingredients = new_ingredients;
-            r.workAmount = rd.WorkAmountTotal(null) * FACTOR;
+            r.workAmount = rd.WorkAmountTotal(null) * factor;
 
             Type IVGClass;
             IVGClass = (Type)Traverse.Create(rd).Field("ingredientValueGetterClass").GetValue();
@@ -239,42 +254,45 @@ namespace Ad2mod
             return r;
         }
 
-        public static void GenRecipes()
+        static void GenRecipes()
         {
-            const int THRESHOLD = thresholdLimit;
-
             var allRecipes = DefDatabase<RecipeDef>.AllDefsListForReading;
             var srcs = new List<RecipeDef>();
             foreach (var recipe in allRecipes)
             {
                 if (recipe.products.Count != 1) continue;
                 if (recipe.ingredients.Count == 0) continue;
-                if (recipe.WorkAmountTotal(null) > THRESHOLD * 60) continue;
+                if (recipe.WorkAmountTotal(null) > thresholdLimit * 60) continue;
                 srcs.Add(recipe);
                 //Log.Message(recipe.label + "\t" + recipe.defName + "\t" + recipe.WorkAmountTotal(null)/60);
             }
             List<ThingDef> RecipesUsers = new List<ThingDef>();
             foreach (var recipe in srcs)
             {
-                var newRecipe = MkNewRecipe(recipe);
-                if (newRecipe == null)
+                bool lastOne = false;
+                foreach (int factor in mulFactors)
                 {
-                    Log.Warning("newRecipe == null  on "+recipe.label);
-                    continue;
-                }
-                newRecipe.ResolveReferences();
-                DefDatabase<RecipeDef>.Add(def: newRecipe);
+                    if (factor * recipe.WorkAmountTotal(null) > thresholdLimit * 60)
+                        lastOne = true;
+                    var newRecipe = MkNewRecipe(recipe, factor);
+                    if (newRecipe == null)
+                    {
+                        Log.Error("newRecipe == null  on " + recipe.label);
+                        continue;
+                    }
+                    newRecipe.ResolveReferences();
+                    DefDatabase<RecipeDef>.Add(def: newRecipe);
 
-                dict.Add(recipe, newRecipe);
-                dictReversed.Add(newRecipe, recipe);
+                    RememberNewRecipe(recipe, newRecipe);
 
-                //Log.Message(newRecipe.label);
-                foreach (var ru in recipe.AllRecipeUsers)
-                {
-                    if (!RecipesUsers.Contains(ru))
-                        RecipesUsers.Add(ru);
-                    if (newRecipe.recipeUsers == null)
-                        ru.recipes.Add(newRecipe);
+                    foreach (var ru in recipe.AllRecipeUsers)
+                    {
+                        if (!RecipesUsers.Contains(ru))
+                            RecipesUsers.Add(ru);
+                        if (newRecipe.recipeUsers == null)
+                            ru.recipes.Add(newRecipe);
+                    }
+                    if (lastOne) break;
                 }
             }
             foreach (var ru in RecipesUsers)

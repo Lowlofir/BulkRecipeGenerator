@@ -28,9 +28,10 @@ namespace Ad2mod
                 if (!Ad2.IsNewRecipe(r))
                 {
                     res.Add(r);
-                    RecipeDef newR = Ad2.GetNewRecipe(r);
-                    if (newR != null)
-                        res.Add(newR);
+                    var newRList = Ad2.GetNewRecipesList(r);
+                    if (newRList != null)
+                        foreach (var nr in newRList)
+                            res.Add(nr);
                 }
             }
 
@@ -49,14 +50,19 @@ namespace Ad2mod
         public static bool Postfix(bool __result, RecipeDef __instance)
         {
             if (__result == false)
-                return __result;
+                return false;
             RecipeDef srcRecipe = Ad2.GetSrcRecipe(__instance);
-            if (srcRecipe != null && srcRecipe.WorkAmountTotal(null) > Ad2WorldComp.instance.threshold * 60)
+            if (srcRecipe == null)
+                return true;
+
+            if (Ad2Mod.settings.limitToX5 && __instance != Ad2.GetNewRecipesList(srcRecipe)[0])
+                return false;
+            if (__instance.workAmount > 1.5 * Ad2WorldComp.instance.threshold * 60)
             {
-               // Log.Message(__instance.label + " rejected with src workAmount " + srcRecipe.WorkAmountTotal(null)/60);
+                //Log.Message(__instance.label + " hidden with src workAmount " + __instance.WorkAmountTotal(null)/60);
                 return false;
             }
-            return __result;
+            return true;
         }
     }
 }
