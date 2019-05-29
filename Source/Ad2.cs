@@ -22,11 +22,13 @@ namespace Ad2mod
     {
         public int defaultThreshold = 60;
         public bool limitToX5 = true;
+        public bool useRightClickMenu = true;
 
         public override void ExposeData()
         {
             Scribe_Values.Look(ref defaultThreshold, "defaultThreshold", 60);
             Scribe_Values.Look(ref limitToX5, "limitToX5", true);
+            //Scribe_Values.Look(ref useRightClickMenu, "useRightClickMenu", true);
             base.ExposeData();
         }
     }
@@ -86,7 +88,6 @@ namespace Ad2mod
         {
             instance = this;
             settings = GetSettings<Ad2Settings>();
-            //Log.Message("settings.defaultThreshold = " + settings.defaultThreshold);
         }
 
         public override string SettingsCategory() => "Bulk recipe generator";
@@ -152,7 +153,29 @@ namespace Ad2mod
         static Dictionary<RecipeDef, List<RecipeDef>> dictON = new Dictionary<RecipeDef, List<RecipeDef>>();
         //  new:old
         static Dictionary<RecipeDef, RecipeDef> dictNO = new Dictionary<RecipeDef, RecipeDef>();
+        //  recipe.LabelCap : RecipeDef
+        static Dictionary<string, RecipeDef> dictLR = new Dictionary<string, RecipeDef>();
 
+        static string TransformRecipeLabel(string s)
+        {
+            if (s.NullOrEmpty())
+            {
+                s = "(missing label)";
+            }
+            return s.TrimEnd(new char[0]);
+        }
+
+        static void RememberRecipeLabel(RecipeDef r)
+        {
+            string label = TransformRecipeLabel(r.LabelCap);
+            if (!dictLR.ContainsKey(label))
+                dictLR.Add(label, r);
+            else if (dictLR[label] != r)
+            {
+                Log.Warning($"Ambiguous recipe label: {label}. Right click menu will be disabled for this one.");
+                dictLR[label] = null;
+            }
+        }
         static void RememberNewRecipe(RecipeDef src, RecipeDef n)
         {
             if (!dictON.ContainsKey(src))
@@ -162,6 +185,9 @@ namespace Ad2mod
             if (dictNO.ContainsKey(n))
                 Log.Error($"dictNO already contains {n.defName} ({n.label})");
             dictNO.Add(n, src);
+
+            RememberRecipeLabel(src);
+            RememberRecipeLabel(n);
         }
 
         public static bool IsSrcRecipe(RecipeDef recipe) => dictON.ContainsKey(recipe);
@@ -177,6 +203,12 @@ namespace Ad2mod
         {
             List<RecipeDef> res;
             dictON.TryGetValue(recipe, out res);
+            return res;
+        }
+        public static RecipeDef GetRecipeByLabel(string label)
+        {
+            RecipeDef res;
+            dictLR.TryGetValue(label, out res);
             return res;
         }
 
@@ -199,11 +231,27 @@ namespace Ad2mod
             return res;
         }
 
+        static void RecipeIconsCompatibility(HarmonyInstance harmony)
+        {
+            try
+            {
+                ((Action)(() =>
+                {
+                    if (LoadedModManager.RunningModsListForReading.Any(x => x.Name == "Recipe icons"))
+                    {
+                        harmony.Patch(AccessTools.Method("RecipeIcons.FloatMenuOptionLeft:DoGUI"),
+                            postfix: new HarmonyMethod(typeof(FloatMenuOption_DoGUI_Patch), "Postfix"));
+                    }
+                }))();
+            }
+            catch (TypeLoadException ex) { }
+        }
 
         static Ad2()
         {
             var harmony = HarmonyInstance.Create("com.local.anon.ad2");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
+            RecipeIconsCompatibility(harmony);
             GenRecipes();
         }
 
