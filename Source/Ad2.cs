@@ -237,8 +237,13 @@ namespace Ad2mod
                 {
                     if (LoadedModManager.RunningModsListForReading.Any(x => x.Name == "Recipe icons"))
                     {
-                        harmony.Patch(AccessTools.Method("RecipeIcons.FloatMenuOptionLeft:DoGUI"),
-                            postfix: new HarmonyMethod(typeof(FloatMenuOption_DoGUI_Patch), "Postfix"));
+                        MethodInfo methodForPatch = AccessTools.Method("RecipeIcons.FloatMenuOptionLeft:DoGUI");
+                        if (methodForPatch == null)
+                        {
+                            Log.Error("BulkRecipeGenerator: LoadedModManager said that RecipeIcons enabled, but methodForPatch == null");
+                            return;
+                        }
+                        harmony.Patch(methodForPatch, postfix: new HarmonyMethod(typeof(FloatMenuOption_DoGUI_Patch), "Postfix"));
                     }
                 }))();
             }
@@ -248,6 +253,11 @@ namespace Ad2mod
         static Ad2()
         {
             var harmony = HarmonyInstance.Create("com.local.anon.ad2");
+            if (harmony == null)
+            {
+                Log.Error("BulkRecipeGenerator: harmony == null");
+                return;
+            }
             harmony.PatchAll(Assembly.GetExecutingAssembly());
             RecipeIconsCompatibility(harmony);
             GenRecipes();
