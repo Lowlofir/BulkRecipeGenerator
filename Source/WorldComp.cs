@@ -9,12 +9,12 @@ namespace Ad2mod
     {
         public static Ad2WorldComp instance;
 
-        public int threshold;
+        //public int threshold;
 
         public Ad2WorldComp(World world) : base(world)
         {
             instance = this;
-            threshold = Ad2Mod.settings.defaultThreshold;
+            //threshold = Ad2Mod.settings.defaultThreshold;
             //Log.Message("WorldComp.ctr():  " + world.info.name + "  " + world.info.seedString);
         }
 
@@ -22,7 +22,7 @@ namespace Ad2mod
         public override void ExposeData()
         {
             base.ExposeData();
-            Scribe_Values.Look(ref threshold, "threshold");
+            //Scribe_Values.Look(ref threshold, "threshold");
             //Log.Message("WorldComp.ExposeData()  threshold = " + threshold);
         }
     }
