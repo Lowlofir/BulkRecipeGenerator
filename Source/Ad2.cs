@@ -28,7 +28,7 @@ namespace Ad2mod
         {
             Scribe_Values.Look(ref defaultThreshold, "defaultThreshold", 60);
             Scribe_Values.Look(ref limitToX5, "limitToX5", true);
-            //Scribe_Values.Look(ref useRightClickMenu, "useRightClickMenu", true);
+            Scribe_Values.Look(ref useRightClickMenu, "useRightClickMenu", true);
             base.ExposeData();
         }
     }
@@ -40,7 +40,7 @@ namespace Ad2mod
 
         NumField defaultThresholdField = new NumField();
         NumField thresholdField = new NumField();
-        Game lastGame;
+        //Game lastGame;
 
         class NumField
         {
@@ -105,30 +105,28 @@ namespace Ad2mod
             Text.Font = GameFont.Small;
             if (defaultThresholdField.DoField(y, "Default target time", ref settings.defaultThreshold))
                 Messages.Message("Default target time changed to " + settings.defaultThreshold, MessageTypeDefOf.NeutralEvent);
-            
+            TooltipHandler.TipRegion(new Rect(x, y, 360, LH), "Has no effect if 'Put recipes in context menu' is checked");
+
             y += LH;
-            Widgets.CheckboxLabeled( new Rect(x, y, 360, LH), "Stop on x5 recipes", ref settings.limitToX5);
+            Rect r1 = new Rect(x, y, 360, LH);
+            Widgets.CheckboxLabeled(r1, "Limit to x5 recipes", ref settings.limitToX5);
+            TooltipHandler.TipRegion(r1, "Add only x5 recipes");
+            y += LH;
+            Rect r2 = new Rect(x, y, 360, LH);
+            Widgets.CheckboxLabeled(r2, "Put recipes in context menu", ref settings.useRightClickMenu);
+            TooltipHandler.TipRegion(r2, "Put recipes to context menu of source recipe instead of adding after it in the same list.");
 
             y += 2*LH+2;
 
             if (Current.Game == null)
             {
-                lastGame = null;
+                //lastGame = null;
                 return;
             }
             Text.Font = GameFont.Medium;
             Widgets.Label(new Rect(x, y, 200, Text.LineHeight), "World settings");
             y += Text.LineHeight + 2;
             Text.Font = GameFont.Small;
-
-            if (lastGame != Current.Game)
-                thresholdField.Reset();
-            var wc = Ad2WorldComp.instance;
-            if (thresholdField.DoField(y, "Current game target time", ref wc.threshold))
-                Messages.Message("Current game target time changed to " + wc.threshold, MessageTypeDefOf.NeutralEvent);
-            lastGame = Current.Game;
-
-            y += 2*LH+2;
 
             List<Bill> bills = Ad2.FindRecipesUses();
             string s = $"Remove modded recipes from save ({bills.Count} found)";
@@ -147,7 +145,7 @@ namespace Ad2mod
     public class Ad2
     {
         const int thresholdLimit = 120;
-        static readonly int[] mulFactors = { 5, 10, 25 };
+        static readonly int[] mulFactors = { 5, 10, 25, 50 };
 
         //  old:new
         static Dictionary<RecipeDef, List<RecipeDef>> dictON = new Dictionary<RecipeDef, List<RecipeDef>>();
@@ -280,7 +278,9 @@ namespace Ad2mod
                 soundWorking = rd.soundWorking,
                 allowMixingIngredients = rd.allowMixingIngredients,
                 defaultIngredientFilter = rd.defaultIngredientFilter,
-            };
+                researchPrerequisite = rd.researchPrerequisite,
+                factionPrerequisiteTags = rd.factionPrerequisiteTags
+        };
             r.products.Add(new ThingDefCountClass(rd.products[0].thingDef, rd.products[0].count * factor));
             List<IngredientCount> new_ingredients = new List<IngredientCount>();
             foreach (var oic in rd.ingredients)
