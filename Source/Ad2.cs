@@ -181,7 +181,10 @@ namespace Ad2mod
             dictON[src].Add(n);
 
             if (dictNO.ContainsKey(n))
-                Log.Error($"dictNO already contains {n.defName} ({n.label})");
+            {
+                Log.Error($"BulkRecipeGenerator: dictNO already contains {n.defName} ({n.label})");
+                return;
+            }
             dictNO.Add(n, src);
 
             RememberRecipeLabel(src);
@@ -240,7 +243,8 @@ namespace Ad2mod
                         MethodInfo methodForPatch = AccessTools.Method("RecipeIcons.FloatMenuOptionLeft:DoGUI");
                         if (methodForPatch == null)
                         {
-                            Log.Error("BulkRecipeGenerator: LoadedModManager said that RecipeIcons enabled, but methodForPatch == null");
+                            Log.Warning("BulkRecipeGenerator: LoadedModManager said that RecipeIcons enabled, but methodForPatch == null," +
+                                " so RecipeIcons patch will not be applied.");
                             return;
                         }
                         harmony.Patch(methodForPatch, postfix: new HarmonyMethod(typeof(FloatMenuOption_DoGUI_Patch), "Postfix"));
@@ -255,7 +259,7 @@ namespace Ad2mod
             var harmony = HarmonyInstance.Create("com.local.anon.ad2");
             if (harmony == null)
             {
-                Log.Error("BulkRecipeGenerator: harmony == null");
+                Log.Error("BulkRecipeGenerator: harmony == null, mod will not work");
                 return;
             }
             harmony.PatchAll(Assembly.GetExecutingAssembly());
@@ -335,7 +339,7 @@ namespace Ad2mod
                     var newRecipe = MkNewRecipe(recipe, factor);
                     if (newRecipe == null)
                     {
-                        Log.Error("newRecipe == null  on " + recipe.label);
+                        Log.Warning($"BulkRecipeGenerator: newRecipe == null  on {recipe.label}, this should not happen normally");
                         continue;
                     }
                     newRecipe.ResolveReferences();
