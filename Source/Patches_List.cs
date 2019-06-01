@@ -69,13 +69,16 @@ namespace Ad2mod
         }
     }
 
+
     [HarmonyPatch(typeof(BillStack))]
     [HarmonyPatch("DoListing")]
     public class BillStack_DoListing_Patch
     {
+        public static bool inDoListing = false;
         public static BillStack lastBillStack;
         public static void Prefix(ref Func<List<FloatMenuOption>> recipeOptionsMaker, BillStack __instance)
         {
+            inDoListing = true;
             lastBillStack = __instance;
             if (!Ad2Mod.settings.useRightClickMenu)
                 return;
@@ -92,8 +95,58 @@ namespace Ad2mod
                 return newList;
             };
         }
+        
+        public static void Postfix()
+        {
+            inDoListing = false;
+        }
+
     }
 
+
+    [HarmonyPatch(typeof(FloatMenu), MethodType.Constructor)]
+    [HarmonyPatch(new Type[] { typeof(List<FloatMenuOption>) })]
+    class PatchFloatMenu
+    {
+        public static List<FloatMenu> trackedFM = new List<FloatMenu>();
+        public static List<FloatMenuOption> trackedFMO = new List<FloatMenuOption>();
+
+        public static bool IsTracked(FloatMenuOption fmo) => trackedFMO.Contains(fmo);
+        public static bool IsTracked(FloatMenu fm) => trackedFM.Contains(fm);
+
+        public static bool Untrack(FloatMenuOption fmo) => trackedFMO.Remove(fmo);
+        public static bool Untrack(FloatMenu fm) => trackedFM.Remove(fm);
+
+        static void Postfix(FloatMenu __instance, List<FloatMenuOption> ___options)
+        {
+            if (BillStack_DoListing_Patch.inDoListing)
+            {
+                trackedFM.Add(__instance);
+                foreach (FloatMenuOption opt in ___options)
+                    trackedFMO.Add(opt);
+            }
+        }
+    }
+
+
+    [HarmonyPatch(typeof(WindowStack))]
+    [HarmonyPatch("TryRemove", new Type[] { typeof(Window), typeof(bool)} )]
+    public class WindowStack_TryRemove_Patch
+    {
+        public static void Postfix(bool __result, Window window)
+        {
+            FloatMenu fm = window as FloatMenu;
+            if (fm == null || __result == false) return;
+            if (!PatchFloatMenu.IsTracked(fm)) 
+                return;
+
+            var fmos = (List<FloatMenuOption>)Traverse.Create(fm).Field("options").GetValue();
+            PatchFloatMenu.Untrack(fm);
+            foreach (FloatMenuOption opt in fmos)
+                PatchFloatMenu.Untrack(opt);
+            //Log.Message($"WindowStack.TryRemove {PatchFloatMenu.trackedFM.Count}  {PatchFloatMenu.trackedFMO.Count}");
+        }
+    }
 
 
     [HarmonyPatch(typeof(FloatMenuOption))]
@@ -127,7 +180,7 @@ namespace Ad2mod
 
         public static void Postfix(ref bool __result, FloatMenuOption __instance)
         {
-            if (!Ad2Mod.settings.useRightClickMenu)
+            if (!Ad2Mod.settings.useRightClickMenu || !PatchFloatMenu.IsTracked(__instance))
                 return;
 
             if (__result == true && Event.current.button == 1)
@@ -148,9 +201,9 @@ namespace Ad2mod
     [HarmonyPatch("Chosen")]
     public class FloatMenuOption_Chosen_Patch
     {
-        public static bool Prefix()
+        public static bool Prefix(FloatMenuOption __instance)
         {
-            if (Ad2Mod.settings.useRightClickMenu && Event.current.button == 1)
+            if (Ad2Mod.settings.useRightClickMenu && Event.current.button == 1 && PatchFloatMenu.IsTracked(__instance))
                 return false;
             return true;
         }
